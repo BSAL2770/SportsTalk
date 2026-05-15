@@ -12,10 +12,42 @@ const LEAGUES = {
   mls: { id: '4346', name: 'MLS' },
 };
 
+// One-time runtime check: native fetch ships in Node 18+. Log loudly if missing.
+if (typeof fetch !== 'function') {
+  console.error(
+    '[sports] global fetch is NOT available. Node version:',
+    process.version,
+    '— install node-fetch or upgrade Node to 18+.'
+  );
+}
+
 async function fetchJson(url) {
+  console.error('[sports] FETCH →', url);
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Upstream returned ${res.status}`);
-  return res.json();
+  const rawBody = await res.text();
+  console.error(
+    '[sports] FETCH ←',
+    url,
+    'status=',
+    res.status,
+    res.statusText,
+    'content-type=',
+    res.headers.get('content-type'),
+    'body-length=',
+    rawBody.length
+  );
+  console.error('[sports] RAW BODY (first 1000 chars):', rawBody.slice(0, 1000));
+
+  if (!res.ok) {
+    throw new Error(`Upstream returned ${res.status}: ${rawBody.slice(0, 200)}`);
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch (parseErr) {
+    console.error('[sports] JSON parse failed:', parseErr);
+    throw new Error(`Upstream returned non-JSON: ${rawBody.slice(0, 200)}`);
+  }
 }
 
 router.get('/:league', async (req, res) => {
@@ -36,8 +68,29 @@ router.get('/:league', async (req, res) => {
     const seasonStr = `${seasonYear - 1}-${seasonYear}`;
 
     const standingsUrl = `https://www.thesportsdb.com/api/v1/json/3/lookuptable.php?l=${league.id}&s=${seasonStr}`;
-    const standingsData = await fetchJson(standingsUrl);
+
+    let standingsData = null;
+    try {
+      standingsData = await fetchJson(standingsUrl);
+    } catch (err) {
+      console.error(
+        '[sports] standings fetch failed for league=',
+        key,
+        'url=',
+        standingsUrl,
+        'error=',
+        err
+      );
+      // Don't bail — fall through to results fallback below.
+    }
+
     const standings = standingsData?.table || [];
+    console.error(
+      '[sports] standings parsed: league=',
+      key,
+      'rowCount=',
+      standings.length
+    );
 
     if (standings.length > 0) {
       return res.json({
@@ -59,8 +112,29 @@ router.get('/:league', async (req, res) => {
 
     // Fallback: recent results
     const pastUrl = `https://www.thesportsdb.com/api/v1/json/3/eventspastleague.php?id=${league.id}`;
-    const pastData = await fetchJson(pastUrl);
+
+    let pastData = null;
+    try {
+      pastData = await fetchJson(pastUrl);
+    } catch (err) {
+      console.error(
+        '[sports] past-events fetch failed for league=',
+        key,
+        'url=',
+        pastUrl,
+        'error=',
+        err
+      );
+      throw err;
+    }
+
     const events = pastData?.events || [];
+    console.error(
+      '[sports] past events parsed: league=',
+      key,
+      'eventCount=',
+      events.length
+    );
 
     return res.json({
       league: league.name,
@@ -75,7 +149,14 @@ router.get('/:league', async (req, res) => {
       })),
     });
   } catch (err) {
-    console.error('Sports proxy error:', err);
+    console.error(
+      '[sports] handler failed: league=',
+      key,
+      'message=',
+      err?.message,
+      'stack=',
+      err?.stack
+    );
     res.status(502).json({ error: 'Failed to fetch sports data' });
   }
 });
