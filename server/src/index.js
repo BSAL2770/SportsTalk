@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 
@@ -23,13 +24,25 @@ app.use(express.json({ limit: '1mb' }));
 // Attach req.user when a valid JWT is present; never rejects.
 app.use(authenticateToken);
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/posts', likesRoutes);
 app.use('/api/posts', commentsRoutes);
 app.use('/api/sports', sportsRoutes);
+
+// Serve the built React app in production.
+// __dirname here is .../server/src, so client/dist sits two levels up.
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
+  app.use(express.static(clientDist));
+  // SPA fallback: any non-API GET returns index.html so React Router can handle it.
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // 404 + error handlers
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));

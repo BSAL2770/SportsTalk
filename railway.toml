@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd client && npm install && npm run build && cd ../server && npm install"
+
+[deploy]
+startCommand = "cd server && npx prisma migrate deploy && npm run start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
