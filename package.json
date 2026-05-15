@@ -6,7 +6,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "cd client && npm install && npm run build && cd ../server && npm install",
+    "build": "cd client && npm install && npm run build && cd ../server && npm install && npx prisma db push --accept-data-loss",
     "start": "cd server && npm run start"
   }
 }
