@@ -2,6 +2,9 @@
 
 A full-stack sports forum where users post images with captions, like and comment, and browse current standings/results from TheSportsDB.
 
+## Live Demo
+🔗 [sportstalk-production.up.railway.app](https://sportstalk-production.up.railway.app)
+
 - **Frontend:** React 18 + Vite + Tailwind CSS
 - **Backend:** Node.js + Express
 - **Database:** PostgreSQL + Prisma ORM
